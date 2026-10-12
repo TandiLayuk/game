@@ -2,598 +2,441 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Retro Mobile 3D Driver</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Lite 3D Mobile Driver</title>
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Nunito:wght@400;700&display=swap" rel="stylesheet">
-    <!-- Three.js (Lightweight build) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            font-family: 'Nunito', sans-serif;
-            background-color: #0b0f19;
-            /* Penting untuk kontrol mobile: Mencegah zoom dan refresh tidak sengaja */
-            touch-action: none;
+            background-color: #87CEEB; /* Warna langit */
+            touch-action: none; /* Cegah pull-to-refresh & scroll */
             user-select: none;
             -webkit-user-select: none;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
-        .hud-font {
-            font-family: 'Chakra Petch', sans-serif;
-        }
-        .glass-panel {
-            background: rgba(15, 23, 42, 0.65);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+        
+        .glass {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
-        /* Animasi pop saat ambil koin */
-        @keyframes pop {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.3); }
-            100% { transform: scale(1); }
-        }
-        .animate-pop {
-            animation: pop 0.2s ease-out;
+
+        /* Efek saat tombol ditekan */
+        .btn-active {
+            transform: scale(0.9);
+            background: rgba(255, 255, 255, 0.4);
         }
     </style>
 </head>
 <body class="w-screen h-screen relative text-white">
 
-    <!-- Kontainer utama untuk 3D Canvas -->
     <div id="game-canvas" class="absolute inset-0 z-0"></div>
 
-    <!-- HUD Atas -->
-    <div class="absolute top-0 left-0 right-0 p-4 z-10 flex justify-between items-start pointer-events-none">
-        
-        <!-- Status Kiri (Koin & Nyawa) -->
-        <div class="glass-panel px-4 py-2 rounded-2xl flex items-center gap-4 shadow-lg pointer-events-auto">
-            <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-full bg-yellow-500/20 text-yellow-400 flex items-center justify-center text-sm shadow-[0_0_10px_rgba(234,179,8,0.3)]">
-                    <i class="fa-solid fa-coins"></i>
-                </div>
-                <div class="flex flex-col">
-                    <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none">Koin</span>
-                    <span id="score-display" class="hud-font text-xl font-bold text-yellow-400 leading-none mt-1">0</span>
-                </div>
-            </div>
-            
-            <div class="w-px h-8 bg-slate-700 mx-1"></div>
-            
-            <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center text-sm shadow-[0_0_10px_rgba(244,63,94,0.3)]">
-                    <i class="fa-solid fa-heart"></i>
-                </div>
-                <div class="flex flex-col">
-                    <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none">Nyawa</span>
-                    <span id="lives-display" class="hud-font text-xl font-bold text-rose-400 leading-none mt-1">3</span>
-                </div>
+    <div class="absolute top-4 left-4 right-4 z-10 flex justify-between pointer-events-none">
+        <div class="glass px-4 py-2 rounded-xl flex flex-col items-center shadow-lg">
+            <span class="text-[10px] text-gray-300 font-bold uppercase tracking-wider">Jarak</span>
+            <div class="flex items-baseline gap-1">
+                <span id="score" class="text-2xl font-black text-yellow-400">0</span>
+                <span class="text-xs font-bold text-gray-300">m</span>
             </div>
         </div>
-
-        <!-- Speedometer Kanan -->
-        <div class="glass-panel px-4 py-2 rounded-2xl flex flex-col items-end shadow-lg pointer-events-auto">
-            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none">Speed</span>
-            <div class="flex items-baseline gap-1 mt-1">
-                <span id="speed-display" class="hud-font text-2xl font-bold text-cyan-400 leading-none">0</span>
-                <span class="hud-font text-xs text-cyan-600 font-bold">KM/H</span>
+        <div class="glass px-4 py-2 rounded-xl flex flex-col items-center shadow-lg">
+            <span class="text-[10px] text-gray-300 font-bold uppercase tracking-wider">Speed</span>
+            <div class="flex items-baseline gap-1">
+                <span id="speed" class="text-2xl font-black text-white">0</span>
+                <span class="text-xs font-bold text-gray-300">km/h</span>
             </div>
         </div>
     </div>
 
-    <!-- Kontrol Layar Sentuh Bawah -->
-    <div class="absolute bottom-6 left-4 right-4 z-10 flex justify-between items-end pointer-events-none">
-        
-        <!-- Tombol Setir (Kiri) -->
-        <div class="flex gap-2 pointer-events-auto">
-            <button id="btn-left" class="glass-panel w-16 h-16 rounded-2xl flex items-center justify-center text-2xl text-slate-300 active:bg-cyan-600/40 active:text-cyan-300 transition-colors shadow-lg shadow-black/50">
-                <i class="fa-solid fa-chevron-left"></i>
-            </button>
-            <button id="btn-right" class="glass-panel w-16 h-16 rounded-2xl flex items-center justify-center text-2xl text-slate-300 active:bg-cyan-600/40 active:text-cyan-300 transition-colors shadow-lg shadow-black/50">
-                <i class="fa-solid fa-chevron-right"></i>
-            </button>
-        </div>
+    <!-- Kontrol Kiri (Setir) -->
+    <div class="absolute bottom-6 left-4 z-10 flex gap-2">
+        <button id="btn-left" class="glass w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-3xl font-black transition-transform select-none">
+            &#10094;
+        </button>
+        <button id="btn-right" class="glass w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-3xl font-black transition-transform select-none">
+            &#10095;
+        </button>
+    </div>
 
-        <!-- Tombol Pedal (Kanan) -->
-        <div class="flex gap-2 pointer-events-auto">
-            <button id="btn-brake" class="glass-panel w-16 h-16 rounded-2xl flex flex-col items-center justify-center text-slate-300 active:bg-rose-600/40 active:text-rose-400 transition-colors shadow-lg shadow-black/50">
-                <i class="fa-solid fa-down-long text-lg"></i>
-                <span class="text-[10px] font-bold mt-1 uppercase tracking-wide">Rem</span>
-            </button>
-            <button id="btn-gas" class="glass-panel w-16 h-16 rounded-2xl flex flex-col items-center justify-center text-slate-300 active:bg-emerald-600/40 active:text-emerald-400 transition-colors shadow-lg shadow-black/50">
-                <i class="fa-solid fa-up-long text-lg"></i>
-                <span class="text-[10px] font-bold mt-1 uppercase tracking-wide">Gas</span>
+    <!-- Kontrol Kanan (Pedal) -->
+    <div class="absolute bottom-6 right-4 z-10 flex gap-2">
+        <button id="btn-brake" class="glass w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex flex-col items-center justify-center transition-transform select-none bg-red-900/40">
+            <span class="text-xs font-bold tracking-widest uppercase text-red-200">Rem</span>
+        </button>
+        <button id="btn-gas" class="glass w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex flex-col items-center justify-center transition-transform select-none bg-green-900/40">
+            <span class="text-xs font-bold tracking-widest uppercase text-green-200">Gas</span>
+        </button>
+    </div>
+
+    <div id="screen-start" class="absolute inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-6 backdrop-blur-sm">
+        <div class="bg-gray-800 p-8 rounded-3xl w-full max-w-sm text-center border border-gray-600 shadow-2xl">
+            <h1 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-blue-500 mb-2">LITE DRIVER 3D</h1>
+            <p class="text-gray-400 text-sm mb-8">Sangat ringan. Hindari kotak merah. Gunakan tombol layar atau Panah/WASD.</p>
+            <button id="btn-start" class="w-full py-4 bg-green-500 hover:bg-green-400 text-black font-black text-lg rounded-xl uppercase tracking-widest active:scale-95 transition-transform">
+                Mulai Mengemudi
             </button>
         </div>
     </div>
 
-    <!-- Start Screen Modal -->
-    <div id="start-screen" class="absolute inset-0 z-50 bg-slate-900/90 backdrop-blur-sm flex flex-col items-center justify-center p-6">
-        <div class="glass-panel p-8 rounded-3xl max-w-sm w-full text-center border-t border-cyan-500/30 shadow-[0_0_50px_rgba(6,182,212,0.15)] relative overflow-hidden">
-            <!-- Dekorasi -->
-            <div class="absolute -top-10 -right-10 w-32 h-32 bg-cyan-500/20 blur-3xl rounded-full"></div>
-            <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-purple-500/20 blur-3xl rounded-full"></div>
-
-            <div class="w-20 h-20 mx-auto bg-gradient-to-br from-cyan-400 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-cyan-500/30 mb-6 relative z-10">
-                <i class="fa-solid fa-car-side text-4xl text-white"></i>
+    <div id="screen-gameover" class="absolute inset-0 z-50 bg-red-900/90 hidden flex-col items-center justify-center p-6 backdrop-blur-md">
+        <div class="bg-gray-900 p-8 rounded-3xl w-full max-w-sm text-center border border-red-500 shadow-2xl">
+            <h2 class="text-4xl font-black text-red-500 mb-2">TABRAKAN!</h2>
+            <div class="bg-black/50 rounded-xl p-4 mb-6">
+                <span class="text-sm text-gray-400 font-bold uppercase tracking-wider block mb-1">Jarak Tempuh</span>
+                <span id="final-score" class="text-4xl font-black text-yellow-400">0m</span>
             </div>
-            
-            <h1 class="hud-font text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400 mb-2 relative z-10">NEON DRIVER</h1>
-            <p class="text-slate-400 text-sm mb-6 relative z-10">Kumpulkan koin emas, hindari rintangan neon merah. Gunakan layar sentuh atau WASD/Panah.</p>
-            
-            <button id="btn-start" class="w-full py-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-black text-lg tracking-widest uppercase transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:shadow-[0_0_30px_rgba(6,182,212,0.6)] relative z-10">
-                Mulai Main
-            </button>
-        </div>
-    </div>
-
-    <!-- Game Over Modal (Awalnya Sembunyi) -->
-    <div id="game-over-screen" class="absolute inset-0 z-50 bg-slate-950/95 backdrop-blur-md hidden flex-col items-center justify-center p-6">
-        <div class="glass-panel p-8 rounded-3xl max-w-sm w-full text-center border-t border-rose-500/30 shadow-[0_0_50px_rgba(244,63,94,0.15)]">
-            <div class="w-20 h-20 mx-auto bg-rose-500/20 rounded-2xl flex items-center justify-center mb-6 border border-rose-500/50">
-                <i class="fa-solid fa-skull text-4xl text-rose-400"></i>
-            </div>
-            
-            <h2 class="hud-font text-3xl font-bold text-rose-400 mb-1">TERTABRAK!</h2>
-            <p class="text-slate-400 text-sm mb-6">Mobil Anda hancur karena rintangan.</p>
-            
-            <div class="bg-slate-900/80 rounded-2xl p-4 mb-6 border border-slate-700">
-                <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Skor Akhir Anda</div>
-                <div class="flex items-center justify-center gap-3">
-                    <i class="fa-solid fa-coins text-yellow-400 text-xl"></i>
-                    <span id="final-score" class="hud-font text-4xl font-bold text-yellow-400">0</span>
-                </div>
-            </div>
-            
-            <button id="btn-restart" class="w-full py-4 rounded-xl bg-white hover:bg-slate-200 text-slate-900 font-black text-lg tracking-widest uppercase transition-all shadow-lg">
+            <button id="btn-restart" class="w-full py-4 bg-white hover:bg-gray-200 text-black font-black text-lg rounded-xl uppercase tracking-widest active:scale-95 transition-transform">
                 Main Lagi
             </button>
         </div>
     </div>
 
     <script>
-        // Variabel Three.js
+        // --- Game State & Config ---
         let scene, camera, renderer;
+        let gameState = 'START'; // START, PLAY, GAMEOVER
         
-        // Objek Game
-        let car;
-        let roadGroup = new THREE.Group();
-        let coins = [];
-        let obstacles = [];
-        let particles = [];
-        
-        // Status Game
-        let gameState = 'START'; // START, PLAYING, GAMEOVER
         let score = 0;
-        let lives = 3;
-        let carSpeed = 0;
-        let carSteering = 0;
+        let speed = 0;
+        let maxSpeed = 0.8; 
+        let acceleration = 0.01;
+        let deceleration = 0.005;
+        let braking = 0.02;
+        let steeringSpeed = 0.15;
         
-        // Konstanta Konfigurasi
-        const MAX_SPEED = 1.2;
-        const ACCELERATION = 0.015;
-        const DECELERATION = 0.01;
-        const BRAKING = 0.03;
-        const STEERING_SPEED = 0.15;
-        const RETURN_SPEED = 0.1;
-        const MAX_STEER = 2.2; // Batas kiri-kanan di jalan
-        
-        // Input Kontrol
-        const input = {
-            forward: false,
-            backward: false,
-            left: false,
-            right: false
-        };
+        // Input tracking
+        const keys = { gas: false, brake: false, left: false, right: false };
 
-        // DOM Elements
-        const uiScore = document.getElementById('score-display');
-        const uiLives = document.getElementById('lives-display');
-        const uiSpeed = document.getElementById('speed-display');
-        const startScreen = document.getElementById('start-screen');
-        const gameOverScreen = document.getElementById('game-over-screen');
-        const uiFinalScore = document.getElementById('final-score');
+        // --- Objek 3D ---
+        let car;
+        const roadLines = [];
+        const obstacles = [];
+        const trees = [];
+        
+        // Konstanta Pooling
+        const NUM_LINES = 15;
+        const NUM_OBSTACLES = 5;
+        const NUM_TREES = 12;
+        const ROAD_WIDTH = 8;
+        const DRAW_DISTANCE = 100;
+
+        // UI Elements
+        const uiScore = document.getElementById('score');
+        const uiSpeed = document.getElementById('speed');
+        const screenStart = document.getElementById('screen-start');
+        const screenGameover = document.getElementById('screen-gameover');
+        const finalScore = document.getElementById('final-score');
 
         function init() {
-            // 1. Setup Scene (Synthwave aesthetic)
+            // 1. Scene
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0a0a1a);
-            scene.fog = new THREE.Fog(0x0a0a1a, 20, 90);
+            scene.background = new THREE.Color(0x87CEEB); // Sky Blue
+            scene.fog = new THREE.Fog(0x87CEEB, 20, DRAW_DISTANCE); // Fog menutupi batas ujung dunia
 
-            // 2. Setup Camera
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
-            // Kamera diletakkan di belakang dan sedikit di atas mobil
-            camera.position.set(0, 5, -8);
-            camera.lookAt(0, 1, 10);
+            // 2. Camera
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, DRAW_DISTANCE + 10);
+            camera.position.set(0, 3, -6);
+            camera.lookAt(0, 0, 5);
 
-            // 3. Setup Renderer (Sangat Ringan)
+            // 3. Renderer (Ultra-Optimized)
             const canvas = document.getElementById('game-canvas');
-            renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: false, // Matikan anti-aliasing agar ringan
+                powerPreference: "low-power" // Beri sinyal ke GPU HP
+            });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Batasi pixel ratio agar HP tidak panas
+            // KUNCI PERFORMA: Batasi resolusi render maksimum ke 1 (Sangat penting untuk HP)
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1)); 
             canvas.appendChild(renderer.domElement);
 
-            // 4. Pencahayaan (Lighting)
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            // 4. Lighting (Simpel)
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
             scene.add(ambientLight);
-
-            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            dirLight.position.set(10, 20, -10);
+            
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            dirLight.position.set(5, 10, 5);
             scene.add(dirLight);
 
-            // Tambahkan cahaya aksen neon
-            const pointLight = new THREE.PointLight(0x00f3ff, 1, 20);
-            pointLight.position.set(0, 2, 0);
-            scene.add(pointLight);
-
-            createEnvironment();
-            createCar();
-            setupPools();
+            buildWorld();
+            setupControls();
 
             // Event Listeners
             window.addEventListener('resize', onWindowResize);
-            setupInputControls();
-            
-            // Tombol UI
             document.getElementById('btn-start').addEventListener('click', startGame);
             document.getElementById('btn-restart').addEventListener('click', resetGame);
 
-            // Mulai Game Loop
+            // Mulai loop animasi
             requestAnimationFrame(gameLoop);
         }
 
-        function createCar() {
-            car = new THREE.Group();
+        function buildWorld() {
+            // A. Tanah Dasar (Rumput)
+            const groundGeo = new THREE.PlaneGeometry(200, DRAW_DISTANCE * 2);
+            // Menggunakan Lambert, lebih ringan dari Phong
+            const groundMat = new THREE.MeshLambertMaterial({ color: 0x3b823e }); 
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.z = DRAW_DISTANCE / 2;
+            scene.add(ground);
 
-            // Material
-            const bodyMat = new THREE.MeshPhongMaterial({ color: 0x00f3ff, shininess: 100 });
-            const darkMat = new THREE.MeshPhongMaterial({ color: 0x111111 });
-            const lightMat = new THREE.MeshBasicMaterial({ color: 0xffffff }); // Lampu depan
-            const tailLightMat = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // Lampu belakang
-
-            // Bodi Utama
-            const bodyGeo = new THREE.BoxGeometry(1.6, 0.5, 3.4);
-            const body = new THREE.Mesh(bodyGeo, bodyMat);
-            body.position.y = 0.4;
-            car.add(body);
-
-            // Kabin / Kaca
-            const cabinGeo = new THREE.BoxGeometry(1.2, 0.5, 1.6);
-            const cabin = new THREE.Mesh(cabinGeo, darkMat);
-            cabin.position.set(0, 0.9, -0.2);
-            car.add(cabin);
-
-            // Roda
-            const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.4, 16);
-            wheelGeo.rotateZ(Math.PI / 2);
-            
-            const wheelPos = [
-                [-0.9, 0.35, 1.1],  // Kiri Depan
-                [0.9, 0.35, 1.1],   // Kanan Depan
-                [-0.9, 0.35, -1.2], // Kiri Belakang
-                [0.9, 0.35, -1.2]   // Kanan Belakang
-            ];
-
-            wheelPos.forEach(pos => {
-                const wheel = new THREE.Mesh(wheelGeo, darkMat);
-                wheel.position.set(...pos);
-                car.add(wheel);
-            });
-
-            // Lampu Depan
-            const hGeo = new THREE.BoxGeometry(0.3, 0.15, 0.1);
-            const hl1 = new THREE.Mesh(hGeo, lightMat);
-            hl1.position.set(-0.6, 0.5, 1.7);
-            car.add(hl1);
-            const hl2 = new THREE.Mesh(hGeo, lightMat);
-            hl2.position.set(0.6, 0.5, 1.7);
-            car.add(hl2);
-
-            // Lampu Belakang
-            const tl1 = new THREE.Mesh(hGeo, tailLightMat);
-            tl1.position.set(-0.6, 0.5, -1.7);
-            car.add(tl1);
-            const tl2 = new THREE.Mesh(hGeo, tailLightMat);
-            tl2.position.set(0.6, 0.5, -1.7);
-            car.add(tl2);
-
-            // Posisi awal mobil (Menghadap ke +Z)
-            car.position.set(0, 0, 0);
-            scene.add(car);
-        }
-
-        function createEnvironment() {
-            scene.add(roadGroup);
-
-            // Jalan (Grid Aesthetic)
-            const roadGeo = new THREE.PlaneGeometry(16, 200);
-            const roadMat = new THREE.MeshPhongMaterial({ color: 0x111122 });
+            // B. Jalan Aspal
+            const roadGeo = new THREE.PlaneGeometry(ROAD_WIDTH, DRAW_DISTANCE * 2);
+            const roadMat = new THREE.MeshBasicMaterial({ color: 0x333333 }); // Basic material super ringan
             const road = new THREE.Mesh(roadGeo, roadMat);
             road.rotation.x = -Math.PI / 2;
-            road.position.set(0, 0, 50);
+            road.position.y = 0.01; // Sedikit di atas tanah untuk mencegah Z-fighting
+            road.position.z = DRAW_DISTANCE / 2;
             scene.add(road);
 
-            // Garis Tepi Neon
-            const edgeGeo = new THREE.PlaneGeometry(0.3, 200);
-            const edgeMat = new THREE.MeshBasicMaterial({ color: 0xaa00ff }); // Ungu Neon
+            // C. Mobil (Kotak Sederhana)
+            car = new THREE.Group();
             
-            const leftEdge = new THREE.Mesh(edgeGeo, edgeMat);
-            leftEdge.rotation.x = -Math.PI / 2;
-            leftEdge.position.set(-3.5, 0.01, 50);
-            scene.add(leftEdge);
+            // Body
+            const bodyGeo = new THREE.BoxGeometry(1.2, 0.6, 2.4);
+            const bodyMat = new THREE.MeshLambertMaterial({ color: 0x3b82f6 }); // Biru
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 0.5;
+            car.add(body);
+            
+            // Atap / Kaca
+            const topGeo = new THREE.BoxGeometry(1.0, 0.4, 1.2);
+            const topMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+            const top = new THREE.Mesh(topGeo, topMat);
+            top.position.set(0, 1.0, -0.2);
+            car.add(top);
 
-            const rightEdge = new THREE.Mesh(edgeGeo, edgeMat);
-            rightEdge.rotation.x = -Math.PI / 2;
-            rightEdge.position.set(3.5, 0.01, 50);
-            scene.add(rightEdge);
+            scene.add(car);
 
-            // Garis tengah jalan (Bergerak untuk ilusi kecepatan)
+            // D. Garis Jalan (Object Pooling)
+            const lineGeo = new THREE.PlaneGeometry(0.2, 3);
             const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-            for (let i = 0; i < 20; i++) {
-                const lineGeo = new THREE.PlaneGeometry(0.2, 4);
+            for(let i = 0; i < NUM_LINES; i++) {
                 const line = new THREE.Mesh(lineGeo, lineMat);
                 line.rotation.x = -Math.PI / 2;
-                line.position.set(0, 0.02, i * 10 - 20);
-                roadGroup.add(line);
-            }
-        }
-
-        function setupPools() {
-            // Pool Koin (10 Koin Emas)
-            const coinGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.1, 16);
-            coinGeo.rotateX(Math.PI / 2);
-            const coinMat = new THREE.MeshPhongMaterial({ 
-                color: 0xffd700, 
-                emissive: 0xaa7700,
-                shininess: 100 
-            });
-
-            for (let i = 0; i < 10; i++) {
-                const coin = new THREE.Mesh(coinGeo, coinMat);
-                resetObjectPosition(coin, i * 20 + 30, true);
-                scene.add(coin);
-                coins.push(coin);
+                line.position.set(0, 0.02, i * (DRAW_DISTANCE / NUM_LINES));
+                scene.add(line);
+                roadLines.push(line);
             }
 
-            // Pool Rintangan (7 Kotak Neon Merah)
-            const obsGeo = new THREE.BoxGeometry(1.6, 1.2, 1.6);
-            const obsMat = new THREE.MeshPhongMaterial({ 
-                color: 0xff003c, 
-                emissive: 0x550011 
-            });
-
-            for (let i = 0; i < 7; i++) {
+            // E. Rintangan (Kotak Merah) - Object Pooling
+            const obsGeo = new THREE.BoxGeometry(1.4, 1.2, 1.4);
+            const obsMat = new THREE.MeshLambertMaterial({ color: 0xe11d48 }); // Merah
+            for(let i = 0; i < NUM_OBSTACLES; i++) {
                 const obs = new THREE.Mesh(obsGeo, obsMat);
-                resetObjectPosition(obs, i * 30 + 60, false);
+                obs.position.y = 0.6;
+                // Sebar rintangan di depan
+                resetObstacle(obs, 30 + i * 25);
                 scene.add(obs);
                 obstacles.push(obs);
             }
-        }
 
-        function resetObjectPosition(obj, zOffset, isCoin) {
-            // Jalur: Kiri (-2.5), Tengah (0), Kanan (2.5)
-            const lanes = [-2.5, 0, 2.5];
-            const randomLane = lanes[Math.floor(Math.random() * lanes.length)];
-            
-            obj.position.set(
-                randomLane, 
-                isCoin ? 0.6 : 0.6, // Tinggi koin vs rintangan
-                car.position.z + zOffset
-            );
-            
-            // Tambahkan rotasi acak untuk rintangan
-            if (!isCoin) {
-                obj.rotation.y = (Math.random() - 0.5) * 0.5;
+            // F. Scenery/Pepohonan (Kotak Hijau di pinggir jalan)
+            const treeGeo = new THREE.BoxGeometry(1, 4, 1);
+            const treeMat = new THREE.MeshLambertMaterial({ color: 0x166534 });
+            for(let i = 0; i < NUM_TREES; i++) {
+                const tree = new THREE.Mesh(treeGeo, treeMat);
+                tree.position.y = 2;
+                resetTree(tree, i * (DRAW_DISTANCE / NUM_TREES));
+                scene.add(tree);
+                trees.push(tree);
             }
-            
-            obj.visible = true;
-            if(isCoin) obj.userData.collected = false;
         }
 
-        function setupInputControls() {
-            // Keyboard Listener
+        function resetObstacle(obs, zDistance) {
+            // Tiga jalur acak
+            const lanes = [-2.5, 0, 2.5];
+            const lane = lanes[Math.floor(Math.random() * lanes.length)];
+            obs.position.x = lane;
+            obs.position.z = zDistance;
+        }
+
+        function resetTree(tree, zDistance) {
+            // Taruh di kiri atau kanan jalan secara acak
+            const isLeft = Math.random() > 0.5;
+            tree.position.x = isLeft ? - (ROAD_WIDTH/2 + 2 + Math.random()*5) : (ROAD_WIDTH/2 + 2 + Math.random()*5);
+            tree.position.z = zDistance;
+            
+            // Random tinggi
+            tree.scale.y = 0.8 + Math.random() * 0.5;
+        }
+
+        function setupControls() {
+            // --- Helper untuk Touch (Mendukung Multi-touch) ---
+            function bindBtn(id, keyStr) {
+                const btn = document.getElementById(id);
+                if(!btn) return;
+                
+                const press = (e) => {
+                    e.preventDefault(); // Cegah fungsi bawaan HP
+                    keys[keyStr] = true;
+                    btn.classList.add('btn-active');
+                };
+                const release = (e) => {
+                    e.preventDefault();
+                    keys[keyStr] = false;
+                    btn.classList.remove('btn-active');
+                };
+
+                btn.addEventListener('touchstart', press, { passive: false });
+                btn.addEventListener('touchend', release, { passive: false });
+                btn.addEventListener('touchcancel', release, { passive: false });
+                
+                // Fallback untuk klik mouse (di PC)
+                btn.addEventListener('mousedown', press);
+                btn.addEventListener('mouseup', release);
+                btn.addEventListener('mouseleave', release);
+            }
+
+            bindBtn('btn-gas', 'gas');
+            bindBtn('btn-brake', 'brake');
+            bindBtn('btn-left', 'left');
+            bindBtn('btn-right', 'right');
+
+            // --- Keyboard Bindings ---
             window.addEventListener('keydown', (e) => {
-                if (e.code === 'ArrowUp' || e.code === 'KeyW') input.forward = true;
-                if (e.code === 'ArrowDown' || e.code === 'KeyS') input.backward = true;
-                if (e.code === 'ArrowLeft' || e.code === 'KeyA') input.left = true;
-                if (e.code === 'ArrowRight' || e.code === 'KeyD') input.right = true;
+                if (e.code === 'ArrowUp' || e.code === 'KeyW') keys.gas = true;
+                if (e.code === 'ArrowDown' || e.code === 'KeyS') keys.brake = true;
+                if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+                if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
             });
 
             window.addEventListener('keyup', (e) => {
-                if (e.code === 'ArrowUp' || e.code === 'KeyW') input.forward = false;
-                if (e.code === 'ArrowDown' || e.code === 'KeyS') input.backward = false;
-                if (e.code === 'ArrowLeft' || e.code === 'KeyA') input.left = false;
-                if (e.code === 'ArrowRight' || e.code === 'KeyD') input.right = false;
+                if (e.code === 'ArrowUp' || e.code === 'KeyW') keys.gas = false;
+                if (e.code === 'ArrowDown' || e.code === 'KeyS') keys.brake = false;
+                if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+                if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
             });
-
-            // Touch Listener (Mobile) - Memakai helper untuk binding multi-event
-            bindTouch('btn-gas', 'forward');
-            bindTouch('btn-brake', 'backward');
-            bindTouch('btn-left', 'left');
-            bindTouch('btn-right', 'right');
-        }
-
-        function bindTouch(elementId, key) {
-            const el = document.getElementById(elementId);
-            if (!el) return;
-            
-            const press = (e) => { e.preventDefault(); input[key] = true; };
-            const release = (e) => { e.preventDefault(); input[key] = false; };
-            
-            // Dukung Touch dan Mouse click
-            el.addEventListener('touchstart', press, {passive: false});
-            el.addEventListener('touchend', release, {passive: false});
-            el.addEventListener('touchcancel', release, {passive: false});
-            
-            el.addEventListener('mousedown', press);
-            el.addEventListener('mouseup', release);
-            el.addEventListener('mouseleave', release);
         }
 
         function startGame() {
-            gameState = 'PLAYING';
-            startScreen.classList.add('hidden');
-            startScreen.classList.remove('flex');
-            
-            // Berikan sedikit kecepatan awal
-            input.forward = true;
-            setTimeout(() => { input.forward = false; }, 500);
+            screenStart.classList.add('hidden');
+            screenStart.classList.remove('flex');
+            gameState = 'PLAY';
+            keys.gas = true; // Auto gas saat mulai (sesaat)
+            setTimeout(() => { keys.gas = false; }, 300);
         }
 
         function resetGame() {
-            // Kembalikan ke nilai awal
+            // Reset state
             score = 0;
-            lives = 3;
-            carSpeed = 0;
-            carSteering = 0;
-            car.position.set(0,0,0);
-            car.rotation.set(0,0,0);
+            speed = 0;
+            car.position.x = 0;
+            car.rotation.z = 0;
+            car.rotation.y = 0;
+            
+            // Reset posisi objek pooling
+            obstacles.forEach((obs, i) => resetObstacle(obs, 40 + i * 25));
+            trees.forEach((tree, i) => resetTree(tree, i * (DRAW_DISTANCE / NUM_TREES)));
             
             uiScore.innerText = '0';
-            uiLives.innerText = '3';
+            uiSpeed.innerText = '0';
             
-            // Reset Posisi Koin & Rintangan
-            coins.forEach((c, i) => resetObjectPosition(c, i * 20 + 40, true));
-            obstacles.forEach((o, i) => resetObjectPosition(o, i * 35 + 80, false));
-            
-            gameOverScreen.classList.add('hidden');
-            gameOverScreen.classList.remove('flex');
-            
-            gameState = 'PLAYING';
-        }
-
-        function updatePhysics() {
-            if (gameState !== 'PLAYING') return;
-
-            // 1. Kecepatan & Akselerasi Mobil
-            if (input.forward) {
-                carSpeed = Math.min(carSpeed + ACCELERATION, MAX_SPEED);
-            } else if (input.backward) {
-                carSpeed = Math.max(carSpeed - BRAKING, 0);
-            } else {
-                // Gesekan jalan (deselerasi alami)
-                carSpeed = Math.max(carSpeed - DECELERATION, 0);
-            }
-
-            // Update UI Kecepatan (Kalibrasi visual ke km/h palsu)
-            uiSpeed.innerText = Math.round(carSpeed * 150);
-
-            // 2. Setir (Steering) - Efek belok kanan/kiri
-            if (input.left) {
-                carSteering = Math.max(carSteering - STEERING_SPEED, -MAX_STEER);
-                car.rotation.y = Math.max(car.rotation.y + 0.05, 0.15); // Efek memiringkan bodi
-                car.rotation.z = Math.min(car.rotation.z + 0.03, 0.1);
-            } else if (input.right) {
-                carSteering = Math.min(carSteering + STEERING_SPEED, MAX_STEER);
-                car.rotation.y = Math.min(car.rotation.y - 0.05, -0.15);
-                car.rotation.z = Math.max(car.rotation.z - 0.03, -0.1);
-            } else {
-                // Kembalikan posisi setir lurus
-                if (carSteering > 0) carSteering = Math.max(0, carSteering - RETURN_SPEED);
-                if (carSteering < 0) carSteering = Math.min(0, carSteering + RETURN_SPEED);
-                car.rotation.y *= 0.8;
-                car.rotation.z *= 0.8;
-            }
-
-            // Terapkan batas jalan agar tidak keluar aspal
-            car.position.x = carSteering;
-            
-            // Mobil terus melaju ke depan (+Z)
-            car.position.z += carSpeed;
-
-            // Kamera mengikuti mobil (Smooth follow)
-            camera.position.z = car.position.z - 8;
-            camera.position.x = car.position.x * 0.3; // Kamera sedikit bergeser saat belok
-
-            // Animasi garis jalan yang diulang
-            roadGroup.children.forEach(line => {
-                // Jika garis tertinggal di belakang kamera, pindahkan ke depan
-                if (line.position.z < car.position.z - 20) {
-                    line.position.z += 200;
-                }
-            });
-        }
-
-        function checkCollisions() {
-            if (gameState !== 'PLAYING') return;
-
-            // Jarak threshold simpel untuk bounding box bundar
-            const hitRadius = 1.4;
-            const coinRadius = 1.2;
-
-            // Deteksi Koin
-            coins.forEach(coin => {
-                // Koin berputar
-                coin.rotation.y += 0.05;
-
-                // Jika koin lewat di belakang mobil, reset ke depan
-                if (coin.position.z < car.position.z - 10) {
-                    resetObjectPosition(coin, 200, true);
-                }
-
-                // Cek tabrakan
-                if (coin.visible && !coin.userData.collected) {
-                    const dist = car.position.distanceTo(coin.position);
-                    if (dist < coinRadius) {
-                        coin.visible = false;
-                        coin.userData.collected = true;
-                        score += 10;
-                        uiScore.innerText = score;
-                        
-                        // Efek animasi UI
-                        uiScore.parentElement.parentElement.classList.remove('animate-pop');
-                        void uiScore.parentElement.parentElement.offsetWidth; // trigger reflow
-                        uiScore.parentElement.parentElement.classList.add('animate-pop');
-                    }
-                }
-            });
-
-            // Deteksi Rintangan
-            obstacles.forEach(obs => {
-                if (obs.position.z < car.position.z - 10) {
-                    resetObjectPosition(obs, 250, false);
-                }
-
-                const dist = car.position.distanceTo(obs.position);
-                if (dist < hitRadius) {
-                    // Terkena Tabrakan!
-                    lives -= 1;
-                    uiLives.innerText = lives;
-                    resetObjectPosition(obs, 250, false); // Pindahkan objek yang ditabrak
-                    
-                    // Efek guncangan kamera simpel
-                    camera.position.x += (Math.random() - 0.5) * 1;
-                    camera.position.y += (Math.random() - 0.5) * 1;
-                    
-                    carSpeed = 0; // Hentikan mobil sejenak
-
-                    if (lives <= 0) {
-                        gameOver();
-                    }
-                }
-            });
+            screenGameover.classList.add('hidden');
+            screenGameover.classList.remove('flex');
+            gameState = 'PLAY';
         }
 
         function gameOver() {
             gameState = 'GAMEOVER';
-            uiFinalScore.innerText = score;
-            gameOverScreen.classList.remove('hidden');
-            gameOverScreen.classList.add('flex');
+            speed = 0;
+            finalScore.innerText = Math.floor(score) + ' m';
+            screenGameover.classList.remove('hidden');
+            screenGameover.classList.add('flex');
+        }
+
+        function updateGame() {
+            if (gameState !== 'PLAY') return;
+
+            // 1. Kecepatan (Akselerasi/Deselerasi)
+            if (keys.gas) {
+                speed += acceleration;
+                if(speed > maxSpeed) speed = maxSpeed;
+            } else if (keys.brake) {
+                speed -= braking;
+                if(speed < 0) speed = 0;
+            } else {
+                speed -= deceleration; // Pelan-pelan berhenti jika dilepas
+                if(speed < 0) speed = 0;
+            }
+
+            // Update UI
+            score += speed * 0.5; // Tambah skor
+            uiScore.innerText = Math.floor(score);
+            uiSpeed.innerText = Math.floor(speed * 150); // Visual km/h
+
+            // 2. Kontrol Setir
+            let isTurning = false;
+            if (keys.left && speed > 0.05) {
+                car.position.x += steeringSpeed * (speed/maxSpeed + 0.2); // Belok lebih cepat jika ngebut
+                car.rotation.z = Math.min(car.rotation.z + 0.05, 0.15); // Mobil miring
+                car.rotation.y = Math.min(car.rotation.y + 0.05, 0.1);
+                isTurning = true;
+            } else if (keys.right && speed > 0.05) {
+                car.position.x -= steeringSpeed * (speed/maxSpeed + 0.2);
+                car.rotation.z = Math.max(car.rotation.z - 0.05, -0.15);
+                car.rotation.y = Math.max(car.rotation.y - 0.05, -0.1);
+                isTurning = true;
+            }
+
+            // Kembalikan posisi mobil tegak jika tidak berbelok
+            if (!isTurning) {
+                car.rotation.z *= 0.8;
+                car.rotation.y *= 0.8;
+            }
+
+            // Batasi mobil agar tidak keluar aspal
+            const maxBound = (ROAD_WIDTH / 2) - 0.6;
+            if (car.position.x > maxBound) car.position.x = maxBound;
+            if (car.position.x < -maxBound) car.position.x = -maxBound;
+
+            // 3. Ilusi Bergerak (Gerakkan dunia mendekati kamera)
+            if (speed > 0) {
+                // Gerakkan Garis Jalan
+                roadLines.forEach(line => {
+                    line.position.z -= speed;
+                    if (line.position.z < -2) {
+                        line.position.z += DRAW_DISTANCE; // Recycle ke depan
+                    }
+                });
+
+                // Gerakkan Pepohonan
+                trees.forEach(tree => {
+                    tree.position.z -= speed;
+                    if (tree.position.z < -5) {
+                        resetTree(tree, DRAW_DISTANCE);
+                    }
+                });
+
+                // Gerakkan Rintangan & Cek Tabrakan
+                obstacles.forEach(obs => {
+                    obs.position.z -= speed;
+                    
+                    // Cek Tabrakan (Bounding Box Sederhana & Cepat)
+                    // Jarak Z dekat, dan Jarak X dekat
+                    if (obs.position.z < 2 && obs.position.z > -1) {
+                        if (Math.abs(car.position.x - obs.position.x) < 1.3) {
+                            gameOver();
+                        }
+                    }
+
+                    // Recycle Rintangan jika lewat di belakang kamera
+                    if (obs.position.z < -5) {
+                        // Taruh di jarak terjauh + sedikit random agar tidak berbaris rapi
+                        resetObstacle(obs, DRAW_DISTANCE + Math.random() * 20);
+                    }
+                });
+            }
         }
 
         function gameLoop() {
             requestAnimationFrame(gameLoop);
-            
-            updatePhysics();
-            checkCollisions();
-            
+            updateGame();
             renderer.render(scene, camera);
         }
 
@@ -603,7 +446,7 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // Jalankan inisialisasi saat window dimuat
+        // Jalankan game saat window siap
         window.onload = init;
     </script>
 </body>
